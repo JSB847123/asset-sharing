@@ -31,6 +31,12 @@ button {
   cursor: pointer;
 }
 
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -93,6 +99,86 @@ button {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px #dbeafe;
   outline: 0;
+}
+
+.change-lock {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.change-lock.unlocked {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.change-lock strong,
+.change-lock span {
+  display: block;
+}
+
+.change-lock strong {
+  color: inherit;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.change-lock span {
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.password-form {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.password-form input {
+  background: #ffffff;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  color: #0f172a;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+
+.password-form input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px #ffedd5;
+  outline: 0;
+}
+
+.password-form button,
+.lock-button {
+  border: 0;
+  border-radius: 8px;
+  font-weight: 900;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.password-form button {
+  background: #ea580c;
+  color: #ffffff;
+}
+
+.lock-button {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.password-form p {
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 800;
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .nav {

@@ -24,6 +24,8 @@ type SortType = "RECENT" | "VALUE";
 const assetTypes: AssetType[] = ["KRW_CASH", "METAL", "KR_STOCK", "US_STOCK"];
 const filters: FilterType[] = ["ALL", ...assetTypes];
 const TITLE_PREFIX_STORAGE_KEY = "woori-asset-note-web/title-prefix";
+const CHANGE_UNLOCKED_SESSION_KEY = "woori-asset-note-web/change-unlocked";
+const CHANGE_PASSWORD = "9207";
 
 export function WebApp() {
   const { assets, addAsset, updateAsset, deleteAsset, getAssetById } = useWebAssets();
@@ -32,6 +34,9 @@ export function WebApp() {
   const [editingAssetId, setEditingAssetId] = useState<string | undefined>();
   const [exchangeRateInput, setExchangeRateInput] = useState("");
   const [titlePrefix, setTitlePrefix] = useState(() => loadTitlePrefix());
+  const [isChangeUnlocked, setIsChangeUnlocked] = useState(() => loadChangeUnlocked());
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   const exchangeRate = parseNumberInput(exchangeRateInput);
   const summary = useMemo(
@@ -61,11 +66,19 @@ export function WebApp() {
   };
 
   const openCreate = () => {
+    if (!ensureChangeUnlocked()) {
+      return;
+    }
+
     setView("FORM");
     setEditingAssetId(undefined);
   };
 
   const openEdit = (assetId: string) => {
+    if (!ensureChangeUnlocked()) {
+      return;
+    }
+
     setView("FORM");
     setEditingAssetId(assetId);
   };
@@ -76,6 +89,10 @@ export function WebApp() {
   };
 
   const handleDelete = (asset: Asset) => {
+    if (!ensureChangeUnlocked()) {
+      return;
+    }
+
     if (window.confirm(`${asset.name} 자산을 삭제할까요?`)) {
       deleteAsset(asset.id);
       if (selectedAssetId === asset.id) {
@@ -85,6 +102,10 @@ export function WebApp() {
   };
 
   const handleSaveAsset = (asset: Asset) => {
+    if (!ensureChangeUnlocked()) {
+      return;
+    }
+
     if (editingAssetId) {
       updateAsset(asset);
       openDetail(asset.id);
@@ -122,6 +143,47 @@ export function WebApp() {
     }
   };
 
+  const handleUnlock = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (passwordInput === CHANGE_PASSWORD) {
+      setIsChangeUnlocked(true);
+      saveChangeUnlocked(true);
+      setPasswordInput("");
+      setPasswordError("");
+      return;
+    }
+
+    setPasswordError("비밀번호가 맞지 않습니다.");
+  };
+
+  const handleLock = () => {
+    setIsChangeUnlocked(false);
+    saveChangeUnlocked(false);
+    setPasswordInput("");
+    setPasswordError("");
+    if (view === "FORM") {
+      openDashboard();
+    }
+  };
+
+  const handleTitlePrefixChange = (value: string) => {
+    if (!ensureChangeUnlocked()) {
+      return;
+    }
+
+    setTitlePrefix(value);
+  };
+
+  const ensureChangeUnlocked = (): boolean => {
+    if (isChangeUnlocked) {
+      return true;
+    }
+
+    setPasswordError("변경하려면 비밀번호를 입력해주세요.");
+    window.alert("변경하려면 비밀번호 4자리를 입력해 잠금을 해제해주세요.");
+    return false;
+  };
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -130,8 +192,9 @@ export function WebApp() {
           <h1 className="editable-title">
             <input
               aria-label="앱 이름 앞부분"
+              disabled={!isChangeUnlocked}
               value={titlePrefix}
-              onChange={(event) => setTitlePrefix(event.target.value)}
+              onChange={(event) => handleTitlePrefixChange(event.target.value)}
               placeholder="우리"
               type="text"
             />
@@ -149,6 +212,31 @@ export function WebApp() {
             자산 추가
           </button>
         </nav>
+        <section className={isChangeUnlocked ? "change-lock unlocked" : "change-lock"}>
+          <div>
+            <strong>{isChangeUnlocked ? "변경 가능" : "변경 잠금"}</strong>
+            <span>{isChangeUnlocked ? "이 브라우저 세션에서 수정할 수 있습니다." : "비밀번호를 입력해야 수정할 수 있습니다."}</span>
+          </div>
+          {isChangeUnlocked ? (
+            <button className="lock-button" type="button" onClick={handleLock}>
+              다시 잠그기
+            </button>
+          ) : (
+            <form className="password-form" onSubmit={handleUnlock}>
+              <input
+                aria-label="변경 비밀번호"
+                inputMode="numeric"
+                maxLength={4}
+                onChange={(event) => setPasswordInput(event.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="비밀번호"
+                type="password"
+                value={passwordInput}
+              />
+              <button type="submit">해제</button>
+              {passwordError ? <p>{passwordError}</p> : null}
+            </form>
+          )}
+        </section>
         <div className="sidebar-note">
           <strong>수동 입력 기준</strong>
           <span>자동 시세 연동 없이 입력한 현재가로 계산합니다.</span>
@@ -167,24 +255,26 @@ export function WebApp() {
             onList={openList}
             onShare={handleShare}
             summary={summary}
+            canModify={isChangeUnlocked}
           />
         ) : null}
 
         {view === "LIST" ? (
-          <AssetListView assets={assets} onCreate={openCreate} onDelete={handleDelete} onDetail={openDetail} onEdit={openEdit} />
+          <AssetListView assets={assets} canModify={isChangeUnlocked} onCreate={openCreate} onDelete={handleDelete} onDetail={openDetail} onEdit={openEdit} />
         ) : null}
 
         {view === "FORM" ? (
           <AssetFormView
             key={editingAsset?.id ?? "new-asset"}
             existingAsset={editingAsset}
+            canModify={isChangeUnlocked}
             onCancel={editingAsset ? () => openDetail(editingAsset.id) : openDashboard}
             onSave={handleSaveAsset}
           />
         ) : null}
 
         {view === "DETAIL" ? (
-          <AssetDetailView asset={selectedAsset} onBack={openList} onDelete={handleDelete} onEdit={openEdit} />
+          <AssetDetailView asset={selectedAsset} canModify={isChangeUnlocked} onBack={openList} onDelete={handleDelete} onEdit={openEdit} />
         ) : null}
       </main>
     </div>
@@ -201,6 +291,7 @@ interface DashboardViewProps {
   onList: () => void;
   onShare: () => void;
   summary: ReturnType<typeof calculatePortfolioSummary>;
+  canModify: boolean;
 }
 
 function DashboardView({
@@ -212,7 +303,8 @@ function DashboardView({
   onEdit,
   onList,
   onShare,
-  summary
+  summary,
+  canModify
 }: DashboardViewProps) {
   const previewAssets = assets.slice(0, 5);
 
@@ -227,7 +319,7 @@ function DashboardView({
           <button className="button secondary" type="button" onClick={onShare}>
             카카오톡으로 공유
           </button>
-          <button className="button primary" type="button" onClick={onCreate}>
+          <button className="button primary" disabled={!canModify} type="button" onClick={onCreate}>
             자산 추가
           </button>
         </div>
@@ -298,7 +390,7 @@ function DashboardView({
         ) : (
           <div className="asset-grid">
             {previewAssets.map((asset) => (
-              <AssetCard key={asset.id} asset={asset} onDetail={onDetail} onEdit={onEdit} />
+              <AssetCard key={asset.id} asset={asset} canModify={canModify} onDetail={onDetail} onEdit={onEdit} />
             ))}
           </div>
         )}
@@ -309,13 +401,14 @@ function DashboardView({
 
 interface AssetListViewProps {
   assets: Asset[];
+  canModify: boolean;
   onCreate: () => void;
   onDelete: (asset: Asset) => void;
   onDetail: (assetId: string) => void;
   onEdit: (assetId: string) => void;
 }
 
-function AssetListView({ assets, onCreate, onDelete, onDetail, onEdit }: AssetListViewProps) {
+function AssetListView({ assets, canModify, onCreate, onDelete, onDetail, onEdit }: AssetListViewProps) {
   const [filter, setFilter] = useState<FilterType>("ALL");
   const [sort, setSort] = useState<SortType>("RECENT");
 
@@ -331,7 +424,7 @@ function AssetListView({ assets, onCreate, onDelete, onDetail, onEdit }: AssetLi
           <p className="eyebrow">자산 목록</p>
           <h2>등록된 자산 {visibleAssets.length}개</h2>
         </div>
-        <button className="button primary" type="button" onClick={onCreate}>
+        <button className="button primary" disabled={!canModify} type="button" onClick={onCreate}>
           자산 추가
         </button>
       </header>
@@ -359,7 +452,7 @@ function AssetListView({ assets, onCreate, onDelete, onDetail, onEdit }: AssetLi
       ) : (
         <div className="asset-grid">
           {visibleAssets.map((asset) => (
-            <AssetCard key={asset.id} asset={asset} onDelete={onDelete} onDetail={onDetail} onEdit={onEdit} />
+            <AssetCard key={asset.id} asset={asset} canModify={canModify} onDelete={onDelete} onDetail={onDetail} onEdit={onEdit} />
           ))}
         </div>
       )}
@@ -369,11 +462,12 @@ function AssetListView({ assets, onCreate, onDelete, onDetail, onEdit }: AssetLi
 
 interface AssetFormViewProps {
   existingAsset?: Asset;
+  canModify: boolean;
   onCancel: () => void;
   onSave: (asset: Asset) => void;
 }
 
-function AssetFormView({ existingAsset, onCancel, onSave }: AssetFormViewProps) {
+function AssetFormView({ existingAsset, canModify, onCancel, onSave }: AssetFormViewProps) {
   const [form, setForm] = useState<AssetFormState>(() => (existingAsset ? createFormFromAsset(existingAsset) : emptyAssetForm));
 
   const updateField = (field: keyof AssetFormState, value: string) => {
@@ -480,7 +574,7 @@ function AssetFormView({ existingAsset, onCancel, onSave }: AssetFormViewProps) 
           <button className="button ghost" type="button" onClick={onCancel}>
             취소
           </button>
-          <button className="button primary" type="submit">
+          <button className="button primary" disabled={!canModify} type="submit">
             저장
           </button>
         </div>
@@ -491,12 +585,13 @@ function AssetFormView({ existingAsset, onCancel, onSave }: AssetFormViewProps) 
 
 interface AssetDetailViewProps {
   asset?: Asset;
+  canModify: boolean;
   onBack: () => void;
   onDelete: (asset: Asset) => void;
   onEdit: (assetId: string) => void;
 }
 
-function AssetDetailView({ asset, onBack, onDelete, onEdit }: AssetDetailViewProps) {
+function AssetDetailView({ asset, canModify, onBack, onDelete, onEdit }: AssetDetailViewProps) {
   if (!asset) {
     return (
       <section className="screen-stack narrow">
@@ -533,10 +628,10 @@ function AssetDetailView({ asset, onBack, onDelete, onEdit }: AssetDetailViewPro
         <button className="button ghost" type="button" onClick={onBack}>
           목록
         </button>
-        <button className="button secondary" type="button" onClick={() => onEdit(asset.id)}>
+        <button className="button secondary" disabled={!canModify} type="button" onClick={() => onEdit(asset.id)}>
           수정
         </button>
-        <button className="button danger" type="button" onClick={() => onDelete(asset)}>
+        <button className="button danger" disabled={!canModify} type="button" onClick={() => onDelete(asset)}>
           삭제
         </button>
       </div>
@@ -546,12 +641,13 @@ function AssetDetailView({ asset, onBack, onDelete, onEdit }: AssetDetailViewPro
 
 interface AssetCardProps {
   asset: Asset;
+  canModify: boolean;
   onDelete?: (asset: Asset) => void;
   onDetail: (assetId: string) => void;
   onEdit: (assetId: string) => void;
 }
 
-function AssetCard({ asset, onDelete, onDetail, onEdit }: AssetCardProps) {
+function AssetCard({ asset, canModify, onDelete, onDetail, onEdit }: AssetCardProps) {
   const profitLoss = calculateAssetProfitLoss(asset);
 
   return (
@@ -582,11 +678,11 @@ function AssetCard({ asset, onDelete, onDetail, onEdit }: AssetCardProps) {
         <button className="small-button" type="button" onClick={() => onDetail(asset.id)}>
           상세
         </button>
-        <button className="small-button" type="button" onClick={() => onEdit(asset.id)}>
+        <button className="small-button" disabled={!canModify} type="button" onClick={() => onEdit(asset.id)}>
           수정
         </button>
         {onDelete ? (
-          <button className="small-button danger-text" type="button" onClick={() => onDelete(asset)}>
+          <button className="small-button danger-text" disabled={!canModify} type="button" onClick={() => onDelete(asset)}>
             삭제
           </button>
         ) : null}
@@ -723,5 +819,25 @@ const saveTitlePrefix = (titlePrefix: string): void => {
     window.localStorage.setItem(TITLE_PREFIX_STORAGE_KEY, titlePrefix);
   } catch {
     // 제목 저장 실패는 자산 데이터 저장과 무관하므로 조용히 무시합니다.
+  }
+};
+
+const loadChangeUnlocked = (): boolean => {
+  try {
+    return window.sessionStorage.getItem(CHANGE_UNLOCKED_SESSION_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
+
+const saveChangeUnlocked = (isUnlocked: boolean): void => {
+  try {
+    if (isUnlocked) {
+      window.sessionStorage.setItem(CHANGE_UNLOCKED_SESSION_KEY, "true");
+      return;
+    }
+    window.sessionStorage.removeItem(CHANGE_UNLOCKED_SESSION_KEY);
+  } catch {
+    // 세션 저장소를 사용할 수 없어도 현재 화면의 잠금 상태는 유지됩니다.
   }
 };
