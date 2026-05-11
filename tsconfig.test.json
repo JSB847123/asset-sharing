@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "rootDir": ".",
+    "outDir": ".test-build"
+  },
+  "include": [
+    "src/types/**/*.ts",
+    "src/utils/calculations.ts",
+    "src/utils/formatters.ts",
+    "src/utils/shareMessage.ts",
+    "tests/**/*.ts"
+  ]
+}
